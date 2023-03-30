@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
+import { Helmet } from "react-helmet";
+import { useQuery } from "react-query";
 import { Link } from "react-router-dom";
 import styled from "styled-components";
+import { fetchCoins } from "../api";
 
-interface CoinObj{
+interface ICoin{
     id: string,
     name: string,
     symbol: string,
@@ -68,28 +71,22 @@ const CoinWrapper = styled.div`
 
 function Coins() {
 
-    const[loading, setLoading] = useState(true);
-    const[coins, setCoins] = useState<CoinObj[]>([]);
-
-    useEffect(()=>{
-        (async () => {
-            const response = await fetch("https://api.coinpaprika.com/v1/coins");
-            const json = await response.json();
-            setCoins(json.slice(0,10));
-            setLoading(false)
-        })();
-        console.log(coins)
-    },[])
+    const { isLoading, data } = useQuery<ICoin[]>("allCoins", fetchCoins)
 
     return (
-      <Container>
+    <Container>
+        <Helmet>
+            <title>
+                Coins
+            </title>
+        </Helmet>
         <Header>
             <Title>Coins</Title>
         </Header>
-        {loading ? 
+        {isLoading ? 
         <Loading>코인 목록을 불러오고 있습니다...</Loading> : 
         <CoinList>
-            {coins.map((coin, idx) =>
+            {data?.slice(0,100).map((coin, idx) =>
                 <Coin key={coin.id}>
                     <Link to={{
                         pathname:`/${coin.id}`,
@@ -101,7 +98,7 @@ function Coins() {
                     </Link>
                 </Coin>)}
         </CoinList>}
-      </Container>
+    </Container>
     );
   }
   

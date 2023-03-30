@@ -1,8 +1,8 @@
-import { constants } from "buffer";
-import { useEffect, useState } from "react";
+import { useQuery } from "react-query";
 import { Link, Route, Switch, useLocation, useParams, useRouteMatch } from "react-router-dom";
-import { text } from "stream/consumers";
+import {Helmet} from "react-helmet"
 import styled from "styled-components";
+import { fetchCoinInfo, fetchCoinPrice } from "../api";
 import Chart from "./Chart";
 import Price from "./Price";
 
@@ -123,44 +123,36 @@ const Tab = styled.span<{isActive:boolean}>`
   background-color: rgba(0,0,0,.5);
   padding: 8px 0;
   border-radius: 8px;
-  color: ${(props)=>props.isActive ?props.theme.textColor: props.theme.accentColor };
+  
   a{
     display: block;
+    color: ${(props)=>props.isActive ?props.theme.accentColor : props.theme.textColor };
   }
 `;
 
 function Coin() {
     const { coinId } = useParams<Params>();
-    const [loading, setLoading] = useState(true);
-    const [info, setInfo] = useState<InfoData>();
-    const [price, setPrice] = useState<PriceData>();
     const {state} = useLocation<RouteState>();
     const priceMatch = useRouteMatch("/:coinId/price");
     const chartMatch = useRouteMatch("/:coinId/chart");
-    console.log(priceMatch)
-    console.log(chartMatch)
-    useEffect(()=>{
-        (
-          async ()=>{
-            const coinInfo = await (
-                await fetch(`https://api.coinpaprika.com/v1/coins/${coinId}`)
-                ).json();
-            const coinPrice = await (
-              await fetch(`https://api.coinpaprika.com/v1/tickers/${coinId}`)
-              ).json();
-            setInfo(coinInfo);
-            setPrice(coinPrice);
-            setLoading(false);
-          }
-          
-        )();
-    },[coinId])
+    const {isLoading : infoLoading, data: infoData} = useQuery<InfoData>(["info", coinId],() => fetchCoinInfo(coinId));
+    const {isLoading : priceLoading, data: priceData } = useQuery<PriceData>(["price", coinId],() => fetchCoinPrice(coinId),
+    {
+      refetchInterval: 10000,
+    }
+    );
+    const loading = infoLoading || priceLoading;
 
     return (
       <Container>
+        <Helmet>
+          <title>
+            {state?.name ? state.name : loading ? "Loading..." : infoData?.name}
+          </title>
+        </Helmet>
         <Header>
             <Title>
-              Coins : {state?.name ? state.name : loading ? "Loading..." : info?.name}
+              Coins : {state?.name ? state.name : loading ? "Loading..." : infoData?.name}
               </Title>
         </Header>
         {loading ? 
@@ -170,35 +162,35 @@ function Coin() {
             <Overview>
             <OverviewItem>
               <span>Rank</span>
-              <span>{info?.rank}</span>
+              <span>{infoData?.rank}</span>
             </OverviewItem>
             <OverviewItem>
               <span>Symbol</span>
-              <span>{info?.symbol}</span>
+              <span>{infoData?.symbol}</span>
             </OverviewItem>
             <OverviewItem>
-              <span>Open Source</span>
-              <span>{info?.open_source ? "Yes" : "No"}</span>
+              <span>Price</span>
+              <span>{priceData?.quotes.USD.price}</span>
             </OverviewItem>
             </Overview>  
             <Description>
-              {info?.description}
+              {infoData?.description}
             </Description>
             <Overview>
             <OverviewItem>
               <span>Total Suply</span>
-              <span>{price?.total_supply}</span>
+              <span>{priceData?.total_supply}</span>
             </OverviewItem>
             <OverviewItem>
               <span>Max Supply</span>
-              <span>{price?.max_supply}</span>
+              <span>{priceData?.max_supply}</span>
             </OverviewItem>
           </Overview>
           <Tabs>
-            <Tab isActive = {chartMatch !== null}>
+            <Tab isActive = {priceMatch !== null}>
               <Link to={`/${coinId}/price`}>Price</Link>
             </Tab>
-            <Tab isActive = {priceMatch !== null}>
+            <Tab isActive = {chartMatch !== null}>
               <Link to={`/${coinId}/chart`}>Chart</Link>
             </Tab>
           </Tabs>
@@ -207,7 +199,7 @@ function Coin() {
               <Price />
             </Route>
             <Route path={`/${coinId}/chart`}>
-              <Chart />
+              <Chart coinId={`${coinId}`}/>
             </Route>
           </Switch>
           </>
